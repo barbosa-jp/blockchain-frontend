@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 
 // Substitua pelo endereço do seu contrato na Sepolia
-export const CONTRACT_ADDRESS = '0xeE361DB55eE10Bc895121e5f1A1E0a44568b4409';
+export const CONTRACT_ADDRESS = '0x829D9f392cB4e381DA03d4393C5ee4Ac8e3a1223';
 
 // ABI do contrato - você deve copiar do arquivo artifacts/contracts/AcademicChain.sol/AcademicChain.json
 export const CONTRACT_ABI = [
@@ -982,7 +982,6 @@ export const CONTRACT_ABI = [
     "stateMutability": "nonpayable",
     "type": "function"
   }
-
 ];
 
 export const getContract = (signerOrProvider) => {

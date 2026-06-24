@@ -56,23 +56,23 @@ const VerifyPage = () => {
         }
 
         const fileHash = await calculateSHA256(file);
-        const [isValid, id] = await contract.verifyByHash(fileHash);
+        const [isValid, cert] = await contract.verifyById(certificateId);
 
         if (isValid) {
           setResult({
             isValid: true,
-            id: id.toString(),
+            id: cert.id.toString(),
             message: 'Certificado válido!',
-            hash: fileHash
+            details: {
+              studentName: cert.studentName,
+              courseName: cert.courseName,
+              workloadHours: cert.workloadHours.toString(),
+              issuedAt: cert.issuedAt,
+              issuedBy: cert.issuedBy,
+              documentHash: cert.documentHash,
+              revoked: cert.revoked
+            }
           });
-          toast.success('Certificado verificado com sucesso!');
-        } else {
-          setResult({
-            isValid: false,
-            message: 'Certificado inválido ou não encontrado',
-            hash: fileHash
-          });
-          toast.error('Certificado não encontrado');
         }
       }
     } catch (err) {
