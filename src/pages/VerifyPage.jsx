@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useMetaMask } from '../hooks/useMetaMask';
 import { getContract } from '../utils/contract';
-import { calculateSHA256 } from '../utils/helpers';
+import { calculateSHA256, formatDate, formatAddress } from '../utils/helpers';
 import toast from 'react-hot-toast';
-import { Search, FileUp, Loader2, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { Search, FileUp, Loader2, CheckCircle, XCircle, FileText, AlertCircle } from 'lucide-react';
 
 const VerifyPage = () => {
   const { provider } = useMetaMask();
-  const [verifyMethod, setVerifyMethod] = useState('id');
+  const [verifyMethod, setVerifyMethod] = useState('file');
   const [certificateId, setCertificateId] = useState('');
   const [file, setFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,39 +40,107 @@ const VerifyPage = () => {
       const contract = getContract(provider);
 
       if (verifyMethod === 'id') {
-        if (!certificateId || isNaN(certificateId)) {
-          toast.error('Digite um ID válido');
+        // ==========================================
+        // VERIFICAÇÃO POR ID
+        // ==========================================
+        if (!certificateId || isNaN(certificateId) || parseInt(certificateId) <= 0) {
+          toast.error('Digite um ID válido (número positivo)');
           setIsLoading(false);
           return;
         }
 
-        toast.info('Funcionalidade em desenvolvimento. Use a verificação por PDF.');
+        try {
+          const [isValid, certData] = await contract.verifyById(parseInt(certificateId));
+          
+          if (isValid && certData) {
+            // Certificado encontrado e válido
+            setResult({
+              isValid: true,
+              id: certData.id ? certData.id.toString() : certificateId,
+              message: '✅ Certificado válido!',
+              details: {
+                studentName: certData.studentName || 'N/A',
+                student: certData.student || 'N/A',
+                courseName: certData.courseName || 'N/A',
+                workloadHours: certData.workloadHours ? certData.workloadHours.toString() : '0',
+                issuedAt: certData.issuedAt ? Number(certData.issuedAt) : Date.now() / 1000,
+                issuedBy: certData.issuedBy || 'N/A',
+                documentHash: certData.documentHash || 'N/A',
+                revoked: certData.revoked || false,
+                revokeReason: certData.revokeReason || 'N/A'
+              }
+            });
+            toast.success('Certificado verificado com sucesso!');
+          } else {
+            // Certificado não encontrado ou revogado
+            setResult({
+              isValid: false,
+              id: certificateId,
+              message: '❌ Certificado inválido ou não encontrado',
+            });
+            toast.error('Certificado não encontrado ou foi revogado');
+          }
+        } catch (err) {
+          console.error('Erro na verificação por ID:', err);
+          
+          if (err.message && err.message.includes('execution reverted')) {
+            setResult({
+              isValid: false,
+              id: certificateId,
+              message: '❌ Certificado não encontrado na blockchain',
+            });
+            toast.error('Certificado não encontrado');
+          } else {
+            setError(err.message);
+            toast.error(`Erro: ${err.message}`);
+          }
+        }
         
       } else {
+        // ==========================================
+        // VERIFICAÇÃO POR PDF
+        // ==========================================
         if (!file) {
           toast.error('Selecione um arquivo PDF');
           setIsLoading(false);
           return;
         }
 
-        const fileHash = await calculateSHA256(file);
-        const [isValid, cert] = await contract.verifyById(certificateId);
+        try {
+          const fileHash = await calculateSHA256(file);
+          const [isValid, certData] = await contract.verifyByHash(fileHash);
 
-        if (isValid) {
-          setResult({
-            isValid: true,
-            id: cert.id.toString(),
-            message: 'Certificado válido!',
-            details: {
-              studentName: cert.studentName,
-              courseName: cert.courseName,
-              workloadHours: cert.workloadHours.toString(),
-              issuedAt: cert.issuedAt,
-              issuedBy: cert.issuedBy,
-              documentHash: cert.documentHash,
-              revoked: cert.revoked
-            }
-          });
+          if (isValid && certData) {
+            setResult({
+              isValid: true,
+              id: certData.id ? certData.id.toString() : 'N/A',
+              message: '✅ Certificado válido!',
+              details: {
+                studentName: certData.studentName || 'N/A',
+                student: certData.student || 'N/A',
+                courseName: certData.courseName || 'N/A',
+                workloadHours: certData.workloadHours ? certData.workloadHours.toString() : '0',
+                issuedAt: certData.issuedAt ? Number(certData.issuedAt) : Date.now() / 1000,
+                issuedBy: certData.issuedBy || 'N/A',
+                documentHash: certData.documentHash || 'N/A',
+                revoked: certData.revoked || false,
+                revokeReason: certData.revokeReason || 'N/A'
+              },
+              hash: fileHash
+            });
+            toast.success('Certificado verificado com sucesso!');
+          } else {
+            setResult({
+              isValid: false,
+              message: '❌ Certificado inválido ou não encontrado',
+              hash: fileHash
+            });
+            toast.error('Certificado não encontrado');
+          }
+        } catch (err) {
+          console.error('Erro na verificação por PDF:', err);
+          setError(err.message);
+          toast.error(`Erro: ${err.message}`);
         }
       }
     } catch (err) {
@@ -86,23 +154,21 @@ const VerifyPage = () => {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Verificar Certificado</h1>
+      <h1 className="text-3xl font-bold text-gray-800 mb-6 flex items-center">
+        <Search className="mr-3 text-primary-600" size={28} />
+        Verificar Certificado
+      </h1>
 
       <div className="card space-y-6">
+        {/* Método de Verificação */}
         <div className="flex space-x-4 border-b border-gray-200 pb-4">
           <button
-            onClick={() => setVerifyMethod('id')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-              verifyMethod === 'id'
-                ? 'bg-primary-100 text-primary-700 font-semibold'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Search size={18} />
-            <span>Por ID</span>
-          </button>
-          <button
-            onClick={() => setVerifyMethod('file')}
+            onClick={() => {
+              setVerifyMethod('file');
+              setResult(null);
+              setError(null);
+              setCertificateId('');
+            }}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
               verifyMethod === 'file'
                 ? 'bg-primary-100 text-primary-700 font-semibold'
@@ -112,8 +178,25 @@ const VerifyPage = () => {
             <FileText size={18} />
             <span>Por PDF</span>
           </button>
+          <button
+            onClick={() => {
+              setVerifyMethod('id');
+              setResult(null);
+              setError(null);
+              setFile(null);
+            }}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+              verifyMethod === 'id'
+                ? 'bg-primary-100 text-primary-700 font-semibold'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Search size={18} />
+            <span>Por ID</span>
+          </button>
         </div>
 
+        {/* Input Fields */}
         {verifyMethod === 'id' ? (
           <div>
             <label className="label-field">ID do Certificado</label>
@@ -127,8 +210,9 @@ const VerifyPage = () => {
                   setError(null);
                 }}
                 className="input-field flex-1"
-                placeholder="Ex: 123"
+                placeholder="Ex: 1, 2, 3..."
                 disabled={isLoading}
+                min="1"
               />
               <button
                 onClick={handleVerify}
@@ -143,6 +227,9 @@ const VerifyPage = () => {
                 <span>Verificar</span>
               </button>
             </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Digite o ID numérico do certificado que você recebeu
+            </p>
           </div>
         ) : (
           <div>
@@ -195,6 +282,7 @@ const VerifyPage = () => {
           </div>
         )}
 
+        {/* Error Display */}
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-2">
             <XCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
@@ -205,6 +293,7 @@ const VerifyPage = () => {
           </div>
         )}
 
+        {/* Result Display */}
         {result && (
           <div className={`p-4 rounded-lg border ${
             result.isValid
@@ -223,16 +312,61 @@ const VerifyPage = () => {
                 }`}>
                   {result.message}
                 </h3>
-                {result.isValid && (
-                  <div className="mt-2 space-y-1 text-sm text-gray-700">
-                    <p><strong>ID:</strong> {result.id}</p>
-                    <p><strong>Hash:</strong> <span className="font-mono text-xs">{result.hash}</span></p>
+                
+                {result.isValid && result.details && (
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                      <p><strong>ID:</strong> #{result.id}</p>
+                      <p><strong>Status:</strong> {result.details.revoked ? '❌ Revogado' : '✅ Válido'}</p>
+                      <p className="col-span-2"><strong>Aluno:</strong> {result.details.studentName}</p>
+                      <p className="col-span-2"><strong>Endereço:</strong> {formatAddress(result.details.student)}</p>
+                      <p className="col-span-2"><strong>Curso:</strong> {result.details.courseName}</p>
+                      <p><strong>Carga Horária:</strong> {result.details.workloadHours}h</p>
+                      <p><strong>Emissor:</strong> {formatAddress(result.details.issuedBy)}</p>
+                      <p className="col-span-2"><strong>Data de Emissão:</strong> {formatDate(result.details.issuedAt)}</p>
+                    </div>
+                    
+                    {result.details.revoked && result.details.revokeReason !== 'N/A' && (
+                      <div className="mt-2 p-2 bg-red-100 border border-red-200 rounded text-red-700">
+                        <strong>Motivo da Revogação:</strong> {result.details.revokeReason}
+                      </div>
+                    )}
+                    
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <p className="text-xs text-gray-500 break-all">
+                        <strong>Hash do Documento:</strong> {result.hash || result.details.documentHash}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {!result.isValid && (
+                  <div className="mt-2 text-sm text-gray-600">
+                    <p>O certificado não foi encontrado na blockchain ou foi revogado.</p>
+                    <ul className="list-disc list-inside mt-1 text-xs text-gray-500">
+                      <li>Verifique se o ID está correto</li>
+                      <li>Verifique se o PDF é o original</li>
+                      <li>O certificado pode ter sido revogado</li>
+                    </ul>
                   </div>
                 )}
               </div>
             </div>
           </div>
         )}
+
+        {/* Info Box */}
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start space-x-2">
+            <AlertCircle className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
+            <div className="text-sm text-blue-700">
+              <p>A verificação é pública e não requer conexão com a MetaMask.</p>
+              <p className="text-xs text-blue-600 mt-1">
+                Qualquer pessoa pode verificar a autenticidade de um certificado usando o ID ou o PDF.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

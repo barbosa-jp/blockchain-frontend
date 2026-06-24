@@ -28,7 +28,6 @@ const IssuePage = () => {
     setError(null);
   };
 
-  // Função para preencher o endereço do estudante com o endereço da carteira conectada
   const fillWithMyAddress = () => {
     if (account) {
       setFormData(prev => ({ ...prev, studentAddress: account }));
@@ -52,7 +51,6 @@ const IssuePage = () => {
       return;
     }
 
-    // Validação básica do endereço Ethereum
     if (!studentAddress.startsWith('0x') || studentAddress.length !== 42) {
       toast.error('Endereço Ethereum inválido. Deve começar com 0x e ter 42 caracteres');
       return;
@@ -87,13 +85,12 @@ const IssuePage = () => {
       const contract = getContract(signer);
       
       // 4. Emitir certificado na blockchain
-      // issueCertificate(address student, string studentName, string courseName, uint256 workloadHours, string documentHash)
       const tx = await contract.issueCertificate(
-        studentAddress,      // address do estudante
-        studentName,         // string
-        courseName,          // string
-        parseInt(workloadHours), // uint256
-        fileHash            // string
+        studentAddress,
+        studentName,
+        courseName,
+        BigInt(parseInt(workloadHours)), // CONVERTER PARA BigInt
+        fileHash
       );
 
       toast.loading('Aguardando confirmação da transação...', { id: 'tx' });
@@ -102,7 +99,6 @@ const IssuePage = () => {
       setTxHash(receipt.hash);
       
       // Buscar o ID do certificado do evento
-      // O evento CertificateIssued tem os parâmetros: id, student, issuedBy, documentHash
       const event = receipt.logs.find(log => {
         try {
           const parsed = contract.interface.parseLog(log);
@@ -114,14 +110,15 @@ const IssuePage = () => {
 
       if (event) {
         const parsedEvent = contract.interface.parseLog(event);
-        setCertificateId(parsedEvent.args[0].toString());
+        // Converter BigInt para String ou Number
+        const id = parsedEvent.args[0];
+        setCertificateId(id.toString()); // CONVERTER BigInt para String
       } else {
-        setCertificateId(Math.floor(Math.random() * 10000));
+        setCertificateId(Math.floor(Math.random() * 10000).toString());
       }
 
       toast.success('Certificado emitido com sucesso!', { id: 'tx' });
 
-      // Limpar formulário
       setFormData({ 
         studentName: '', 
         studentAddress: '',
@@ -171,7 +168,6 @@ const IssuePage = () => {
       </h1>
 
       <form onSubmit={handleSubmit} className="card space-y-6">
-        {/* Nome do Aluno */}
         <div>
           <label className="label-field flex items-center">
             <User size={18} className="mr-2 text-primary-600" />
@@ -189,7 +185,6 @@ const IssuePage = () => {
           />
         </div>
 
-        {/* Endereço do Aluno */}
         <div>
           <label className="label-field flex items-center">
             <Wallet size={18} className="mr-2 text-primary-600" />
@@ -220,7 +215,6 @@ const IssuePage = () => {
           </p>
         </div>
 
-        {/* Nome do Curso */}
         <div>
           <label className="label-field flex items-center">
             <BookOpen size={18} className="mr-2 text-primary-600" />
@@ -238,7 +232,6 @@ const IssuePage = () => {
           />
         </div>
 
-        {/* Carga Horária */}
         <div>
           <label className="label-field flex items-center">
             <Clock size={18} className="mr-2 text-primary-600" />
@@ -257,7 +250,6 @@ const IssuePage = () => {
           />
         </div>
 
-        {/* Informação sobre o PDF */}
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-700 flex items-center">
             <FileUp className="mr-2" size={18} />
@@ -265,7 +257,6 @@ const IssuePage = () => {
           </p>
         </div>
 
-        {/* Botão de Emissão */}
         <button
           type="submit"
           disabled={isLoading}
@@ -284,7 +275,6 @@ const IssuePage = () => {
           )}
         </button>
 
-        {/* Erro */}
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-2">
             <XCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
@@ -295,7 +285,6 @@ const IssuePage = () => {
           </div>
         )}
 
-        {/* Sucesso */}
         {txHash && generatedPDF && (
           <div className="space-y-4">
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start space-x-2">
@@ -319,7 +308,6 @@ const IssuePage = () => {
               </div>
             </div>
             
-            {/* Botão de Download */}
             <button
               onClick={handleDownloadPDF}
               className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center space-x-2 transition-colors"
