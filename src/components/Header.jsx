@@ -39,6 +39,9 @@ const Header = () => {
                 <Link to="/my-certificates" className="text-gray-600 hover:text-primary-600 transition-colors">
                   Meus Certificados
                 </Link>
+                <Link to="/governance" className="text-gray-600 hover:text-primary-600 transition-colors">
+                  Governança
+                </Link>
               </>
             )}
           </nav>
