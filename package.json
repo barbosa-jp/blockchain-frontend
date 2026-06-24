@@ -19,7 +19,6 @@
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
-    "@vitejs/devtools": "^0.1.24",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",
