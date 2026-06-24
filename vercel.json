@@ -1,15 +1,12 @@
 {
-  "buildCommand": "npm install --legacy-peer-deps && npm run build",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "installCommand": "npm install --legacy-peer-deps",
   "framework": "vite",
   "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "env": {
-    "VITE_CONTRACT_ADDRESS": "0x829D9f392cB4e381DA03d4393C5ee4Ac8e3a1223"
-  }
-
+  ]
 }
