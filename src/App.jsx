@@ -8,6 +8,7 @@ import IssuePage from './pages/IssuePage';
 import VerifyPage from './pages/VerifyPage';
 import MyCertificatesPage from './pages/MyCertificatesPage';
 import ManagePage from './pages/ManagePage';
+import GovernancePage from './pages/GovernancePage';
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
           <Route path="/verify" element={<VerifyPage />} />
           <Route path="/my-certificates" element={<MyCertificatesPage />} />
           <Route path="/manage" element={<ManagePage />} />
+          <Route path="/governance" element={<GovernancePage />} />
         </Routes>
       </Layout>
     </>

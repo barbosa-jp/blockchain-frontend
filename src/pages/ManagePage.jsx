@@ -57,7 +57,7 @@ const ManagePage = () => {
 
   const loadIssuers = async (contract) => {
     try {
-      const issuerList = await contract.getIssuers();
+      const issuerList = await contract.getAuthorizedIssuers();
       console.log('Lista de emissores:', issuerList);
       
       const issuerAddresses = issuerList.map(addr => addr.toLowerCase());
