@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useMetaMask } from '../hooks/useMetaMask';
 import { getContract } from '../utils/contract';
 import { generateCertificatePDF } from '../utils/pdfGenerator';
 import toast from 'react-hot-toast';
-import { FileUp, Loader2, CheckCircle, XCircle, Download, User, BookOpen, Clock, Wallet } from 'lucide-react';
+import { FileUp, Loader2, CheckCircle, XCircle, Download, User, BookOpen, Clock, Wallet, Sparkles } from 'lucide-react';
 
 const IssuePage = () => {
   const { signer, isConnected, account } = useMetaMask();
-  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     studentName: '',
@@ -62,7 +60,7 @@ const IssuePage = () => {
     setGeneratedPDF(null);
 
     try {
-      // 1. Gerar PDF automaticamente
+      // 1. Gerar Certificado em PDF
       const pdfData = {
         studentName,
         courseName,
@@ -89,7 +87,7 @@ const IssuePage = () => {
         studentAddress,
         studentName,
         courseName,
-        BigInt(parseInt(workloadHours)), // CONVERTER PARA BigInt
+        BigInt(parseInt(workloadHours)),
         fileHash
       );
 
@@ -110,9 +108,8 @@ const IssuePage = () => {
 
       if (event) {
         const parsedEvent = contract.interface.parseLog(event);
-        // Converter BigInt para String ou Number
         const id = parsedEvent.args[0];
-        setCertificateId(id.toString()); // CONVERTER BigInt para String
+        setCertificateId(id.toString());
       } else {
         setCertificateId(Math.floor(Math.random() * 10000).toString());
       }
@@ -250,10 +247,10 @@ const IssuePage = () => {
           />
         </div>
 
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-700 flex items-center">
-            <FileUp className="mr-2" size={18} />
-            O PDF do certificado será gerado automaticamente pelo sistema
+        <div className="p-4 bg-gradient-to-r from-primary-50 to-purple-50 border border-primary-200 rounded-lg">
+          <p className="text-sm text-primary-700 flex items-center">
+            <Sparkles className="mr-2" size={18} />
+            O certificado será gerado em PDF com design profissional
           </p>
         </div>
 
@@ -294,9 +291,6 @@ const IssuePage = () => {
                 <p className="text-sm text-gray-600">
                   ID do Certificado: #{certificateId || 'N/A'}
                 </p>
-                <p className="text-sm text-gray-600">
-                  Endereço do Aluno: {formData.studentAddress.slice(0, 10)}...{formData.studentAddress.slice(-6)}
-                </p>
                 <a
                   href={`https://sepolia.etherscan.io/tx/${txHash}`}
                   target="_blank"
@@ -313,7 +307,7 @@ const IssuePage = () => {
               className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center space-x-2 transition-colors"
             >
               <Download size={20} />
-              <span>Baixar PDF do Certificado</span>
+              <span>Baixar Certificado PDF</span>
             </button>
           </div>
         )}

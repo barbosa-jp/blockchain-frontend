@@ -4,16 +4,7 @@ import { getContract } from '../utils/contract';
 import { formatDate, formatAddress } from '../utils/helpers';
 import { generateCertificatePDF } from '../utils/pdfGenerator';
 import toast from 'react-hot-toast';
-import { 
-  Award, 
-  Loader2, 
-  CheckCircle, 
-  XCircle, 
-  ExternalLink, 
-  Eye, 
-  Download, 
-  FileText  // ← ADICIONADO FileText
-} from 'lucide-react';
+import { Award, Loader2, CheckCircle, XCircle, ExternalLink, Download, FileText, Eye } from 'lucide-react';
 
 const MyCertificatesPage = () => {
   const { signer, account, isConnected } = useMetaMask();
@@ -88,7 +79,6 @@ const MyCertificatesPage = () => {
             revokeReason: cert.revokeReason || 'N/A'
           };
           
-          // Gerar PDF para este certificado
           await generatePDFForCertificate(certData);
           
           return certData;
@@ -177,9 +167,6 @@ const MyCertificatesPage = () => {
           <p className="text-gray-500">
             Você ainda não possui certificados emitidos nesta carteira
           </p>
-          <p className="text-sm text-gray-400 mt-2">
-            Endereço: {formatAddress(account)}
-          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -240,7 +227,6 @@ const MyCertificatesPage = () => {
               )}
 
               <div className="mt-4 flex justify-end space-x-3">
-                {/* Botão Visualizar */}
                 {pdfUrls[cert.id] && (
                   <a
                     href={pdfUrls[cert.id]}
@@ -253,7 +239,6 @@ const MyCertificatesPage = () => {
                   </a>
                 )}
                 
-                {/* Botão Baixar */}
                 {pdfUrls[cert.id] && (
                   <button
                     onClick={() => handleDownloadPDF(cert)}
@@ -264,7 +249,6 @@ const MyCertificatesPage = () => {
                   </button>
                 )}
 
-                {/* Link para Etherscan */}
                 <a
                   href={`https://sepolia.etherscan.io/address/${account}`}
                   target="_blank"

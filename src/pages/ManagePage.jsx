@@ -3,7 +3,7 @@ import { useMetaMask } from '../hooks/useMetaMask';
 import { getContract } from '../utils/contract';
 import { formatAddress } from '../utils/helpers';
 import toast from 'react-hot-toast';
-import { Users, UserPlus, UserMinus, Loader2, CheckCircle, Shield, AlertCircle, Eye } from 'lucide-react';
+import { Users, UserPlus, UserMinus, Loader2, CheckCircle, Shield, AlertCircle } from 'lucide-react';
 
 const ManagePage = () => {
   const { signer, account, isConnected } = useMetaMask();
@@ -34,19 +34,15 @@ const ManagePage = () => {
     try {
       const contract = getContract(signer);
       
-      // Verifica quem é o owner
       const owner = await contract.owner();
       setOwnerAddress(owner);
       
-      // Verifica se o usuário conectado é o owner
       const isUserOwner = owner.toLowerCase() === account.toLowerCase();
       setIsOwner(isUserOwner);
       
-      // Verifica se o usuário é um emissor autorizado
       const isUserAuthorized = await contract.isAuthorizedIssuer(account);
       setIsAuthorized(isUserAuthorized);
 
-      // Se for owner OU emissor autorizado, carrega a lista de emissores
       if (isUserOwner || isUserAuthorized) {
         await loadIssuers(contract);
       }
@@ -61,29 +57,20 @@ const ManagePage = () => {
 
   const loadIssuers = async (contract) => {
     try {
-      // Como não temos uma função para listar todos os emissores,
-      // vamos buscar os emissores a partir do evento ou de um mapping
-      // Por enquanto, vamos usar uma lista simulada
-      // Na prática, você precisaria armazenar os emissores em um array no contrato
+      const issuerList = await contract.getIssuers();
+      console.log('Lista de emissores:', issuerList);
       
-      // Exemplo de como seria com um array:
-      // const issuerList = await contract.getIssuers();
-      // setIssuers(issuerList);
-      
-      // Por enquanto, vamos criar uma lista vazia
-      setIssuers([]);
-      
-      // Para teste, você pode adicionar alguns endereços manualmente
-      // setIssuers(['0x123...', '0x456...']);
+      const issuerAddresses = issuerList.map(addr => addr.toLowerCase());
+      setIssuers(issuerAddresses);
     } catch (err) {
       console.error('Erro ao carregar emissores:', err);
+      setIssuers([]);
     }
   };
 
   const handleAddIssuer = async (e) => {
     e.preventDefault();
 
-    // Permite tanto owner quanto emissores autorizados
     if (!isOwner && !isAuthorized) {
       toast.error('Você não tem permissão para autorizar emissores');
       return;
@@ -94,15 +81,18 @@ const ManagePage = () => {
       return;
     }
 
-    // Validação básica do endereço
     if (!newIssuerAddress.startsWith('0x') || newIssuerAddress.length !== 42) {
-      toast.error('Endereço Ethereum inválido. Deve começar com 0x e ter 42 caracteres');
+      toast.error('Endereço Ethereum inválido');
       return;
     }
 
-    // Não permite autorizar a si mesmo
     if (newIssuerAddress.toLowerCase() === account.toLowerCase()) {
-      toast.error('Você já é um emissor autorizado');
+      toast.error('Você não pode autorizar a si mesmo');
+      return;
+    }
+
+    if (newIssuerAddress.toLowerCase() === ownerAddress.toLowerCase()) {
+      toast.error('O owner já é um emissor autorizado');
       return;
     }
 
@@ -111,6 +101,14 @@ const ManagePage = () => {
 
     try {
       const contract = getContract(signer);
+      
+      const isAlreadyIssuer = await contract.isAuthorizedIssuer(newIssuerAddress);
+      if (isAlreadyIssuer) {
+        toast.error('Este endereço já é um emissor autorizado');
+        setIsSubmitting(false);
+        return;
+      }
+      
       const tx = await contract.authorizeIssuer(newIssuerAddress);
       
       toast.loading('Aguardando confirmação da transação...', { id: 'add-issuer' });
@@ -119,31 +117,41 @@ const ManagePage = () => {
       toast.success('Emissor autorizado com sucesso!', { id: 'add-issuer' });
       setNewIssuerAddress('');
       
-      // Recarregar lista
       await checkPermissionsAndLoad();
     } catch (err) {
       console.error('Erro ao autorizar emissor:', err);
-      setError(err.message);
-      toast.error(`Erro: ${err.message}`, { id: 'add-issuer' });
+      let errorMsg = err.message;
+      
+      if (errorMsg.includes('execution reverted')) {
+        if (errorMsg.includes('Apenas owner ou emissores autorizados')) {
+          errorMsg = '❌ Você não tem permissão para autorizar emissores';
+        } else if (errorMsg.includes('Ja e um emissor autorizado')) {
+          errorMsg = '❌ Este endereço já é um emissor autorizado';
+        } else if (errorMsg.includes('Endereco invalido')) {
+          errorMsg = '❌ Endereço inválido';
+        } else {
+          errorMsg = '❌ Transação revertida. Verifique se você tem permissão.';
+        }
+      }
+      
+      setError(errorMsg);
+      toast.error(errorMsg, { id: 'add-issuer' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleRemoveIssuer = async (address) => {
-    // Permite tanto owner quanto emissores autorizados
     if (!isOwner && !isAuthorized) {
       toast.error('Você não tem permissão para revogar emissores');
       return;
     }
 
-    // Não permite revogar a si mesmo
     if (address.toLowerCase() === account.toLowerCase()) {
       toast.error('Você não pode revogar a si mesmo');
       return;
     }
 
-    // Não permite revogar o owner
     if (address.toLowerCase() === ownerAddress.toLowerCase()) {
       toast.error('Não é possível revogar o owner do contrato');
       return;
@@ -165,28 +173,28 @@ const ManagePage = () => {
 
       toast.success('Emissor revogado com sucesso!', { id: 'remove-issuer' });
       
-      // Recarregar lista
       await checkPermissionsAndLoad();
     } catch (err) {
       console.error('Erro ao revogar emissor:', err);
-      setError(err.message);
-      toast.error(`Erro: ${err.message}`, { id: 'remove-issuer' });
+      let errorMsg = err.message;
+      
+      if (errorMsg.includes('execution reverted')) {
+        if (errorMsg.includes('Apenas owner ou emissores autorizados')) {
+          errorMsg = '❌ Você não tem permissão para revogar emissores';
+        } else if (errorMsg.includes('Nao e um emissor autorizado')) {
+          errorMsg = '❌ Este endereço não é um emissor autorizado';
+        } else {
+          errorMsg = '❌ Transação revertida. Verifique se você tem permissão.';
+        }
+      }
+      
+      setError(errorMsg);
+      toast.error(errorMsg, { id: 'remove-issuer' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Função para verificar se um endereço é emissor
-  const checkIfIssuer = async (address) => {
-    try {
-      const contract = getContract(signer);
-      return await contract.isAuthorizedIssuer(address);
-    } catch {
-      return false;
-    }
-  };
-
-  // Estado de carregamento
   if (isLoading || isChecking) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -196,7 +204,6 @@ const ManagePage = () => {
     );
   }
 
-  // Se não estiver conectado
   if (!isConnected) {
     return (
       <div className="text-center py-12">
@@ -209,7 +216,6 @@ const ManagePage = () => {
     );
   }
 
-  // Se não for owner nem emissor autorizado
   if (!isOwner && !isAuthorized) {
     return (
       <div className="max-w-2xl mx-auto">
@@ -236,7 +242,7 @@ const ManagePage = () => {
           <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start space-x-2">
             <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={18} />
             <p className="text-sm text-yellow-700 text-left">
-              Para se tornar um emissor autorizado, entre em contato com o owner do contrato.
+              Para se tornar um emissor autorizado, entre em contato com o owner ou um emissor autorizado.
             </p>
           </div>
         </div>
@@ -244,7 +250,6 @@ const ManagePage = () => {
     );
   }
 
-  // Se for owner ou emissor autorizado - mostrar o gerenciamento completo
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-6">
@@ -266,7 +271,7 @@ const ManagePage = () => {
             </span>
           )}
           <span className="text-sm text-gray-500 ml-2">
-            {isOwner || isAuthorized ? 'Você tem permissão total para gerenciar emissores' : ''}
+            {isOwner || isAuthorized ? 'Você tem permissão para gerenciar emissores' : ''}
           </span>
         </div>
       </div>
@@ -278,7 +283,6 @@ const ManagePage = () => {
         </div>
       )}
 
-      {/* Add New Issuer - Disponível para owner e emissores */}
       {(isOwner || isAuthorized) && (
         <div className="card mb-8">
           <h2 className="text-xl font-semibold text-gray-700 mb-4 flex items-center">
@@ -314,7 +318,6 @@ const ManagePage = () => {
         </div>
       )}
 
-      {/* Issuers List - Visível para todos autorizados */}
       <div className="card">
         <h2 className="text-xl font-semibold text-gray-700 mb-4 flex items-center">
           <Users className="mr-2" size={20} />
@@ -338,51 +341,55 @@ const ManagePage = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {issuers.map((issuer, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="text-green-500" size={18} />
-                  <span className="font-mono text-sm">{formatAddress(issuer)}</span>
-                  {issuer.toLowerCase() === account.toLowerCase() && (
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                      Você
-                    </span>
-                  )}
-                  {issuer.toLowerCase() === ownerAddress.toLowerCase() && (
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                      Owner
-                    </span>
+            {issuers.map((issuer, index) => {
+              const isCurrentUser = issuer.toLowerCase() === account.toLowerCase();
+              const isOwnerAddress = issuer.toLowerCase() === ownerAddress.toLowerCase();
+              
+              return (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <CheckCircle className="text-green-500" size={18} />
+                    <span className="font-mono text-sm">{formatAddress(issuer)}</span>
+                    {isCurrentUser && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                        Você
+                      </span>
+                    )}
+                    {isOwnerAddress && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                        Owner
+                      </span>
+                    )}
+                  </div>
+                  {(isOwner || isAuthorized) && (
+                    <button
+                      onClick={() => handleRemoveIssuer(issuer)}
+                      disabled={isSubmitting || isCurrentUser || isOwnerAddress}
+                      className={`text-red-500 hover:text-red-700 transition-colors p-1 hover:bg-red-50 rounded ${
+                        (isCurrentUser || isOwnerAddress) ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                      title={
+                        isCurrentUser ? 'Não pode revogar a si mesmo' : 
+                        isOwnerAddress ? 'Não pode revogar o owner' : 
+                        'Revogar emissor'
+                      }
+                    >
+                      <UserMinus size={18} />
+                    </button>
                   )}
                 </div>
-                {(isOwner || isAuthorized) && (
-                  <button
-                    onClick={() => handleRemoveIssuer(issuer)}
-                    disabled={isSubmitting || issuer.toLowerCase() === account.toLowerCase() || issuer.toLowerCase() === ownerAddress.toLowerCase()}
-                    className={`text-red-500 hover:text-red-700 transition-colors p-1 hover:bg-red-50 rounded ${
-                      (issuer.toLowerCase() === account.toLowerCase() || issuer.toLowerCase() === ownerAddress.toLowerCase()) 
-                        ? 'opacity-50 cursor-not-allowed' 
-                        : ''
-                    }`}
-                    title={issuer.toLowerCase() === account.toLowerCase() ? 'Não pode revogar a si mesmo' : 
-                           issuer.toLowerCase() === ownerAddress.toLowerCase() ? 'Não pode revogar o owner' : 
-                           'Revogar emissor'}
-                    disabled={issuer.toLowerCase() === account.toLowerCase() || issuer.toLowerCase() === ownerAddress.toLowerCase()}
-                  >
-                    <UserMinus size={18} />
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-700 flex items-center">
             <Shield className="mr-2" size={16} />
-            Apenas emissores autorizados podem emitir e revogar certificados.
+            Apenas emissores autorizados podem emitir certificados.
           </p>
           {(isOwner || isAuthorized) && (
             <p className="text-sm text-blue-600 mt-1">
@@ -396,4 +403,5 @@ const ManagePage = () => {
   );
 };
 
+// ✅ VERIFIQUE SE ESTA LINHA EXISTE NO FINAL DO ARQUIVO
 export default ManagePage;
