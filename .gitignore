@@ -1,0 +1,71 @@
+# Dependências
+/node_modules
+/.pnp
+.pnp.js
+.pnp.loader.mjs
+
+# Arquivos de build
+/dist
+/build
+/.vite
+/*.tgz
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Arquivos de log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Cache
+/.cache
+/.parcel-cache
+/.vscode
+/.idea
+*.swp
+*.swo
+*~
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Arquivos de cobertura de teste
+/coverage
+/.nyc_output
+*.lcov
+
+# Arquivos de configuração do editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Arquivos de diagnóstico
+*.tsbuildinfo
+
+# Arquivos do Hardhat (se houver)
+/cache
+/artifacts
+/typechain-types
+/generated
+/coverage.json
+/coverage
+
+# Arquivos do Node
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
