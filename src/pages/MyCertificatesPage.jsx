@@ -13,25 +13,6 @@ const MyCertificatesPage = () => {
   const [error, setError] = useState(null);
   const [pdfUrls, setPdfUrls] = useState({});
 
-  const getDocumentTypeFromStorage = (certId, studentAddress) => {
-    try {
-      const savedData = localStorage.getItem('academicchain_docs');
-      if (!savedData) {
-        return 'certificate';
-      }
-      
-      const savedDocs = JSON.parse(savedData);
-      const doc = savedDocs.find(d => 
-        d.id === certId && d.studentAddress.toLowerCase() === studentAddress.toLowerCase()
-      );
-      
-      return doc ? doc.type || 'certificate' : 'certificate';
-    } catch (err) {
-      console.error('Erro ao ler localStorage:', err);
-      return 'certificate';
-    }
-  };
-
   useEffect(() => {
     if (isConnected && account) {
       loadCertificates();
@@ -42,40 +23,21 @@ const MyCertificatesPage = () => {
   }, [isConnected, account]);
 
   const generatePDFForCertificate = async (cert) => {
-    try {
-      const pdfData = {
-        studentName: cert.studentName,
-        courseName: cert.courseName,
-        workloadHours: parseInt(cert.workloadHours) || 0,
-        issueDate: cert.issuedAt ? new Date(cert.issuedAt * 1000).getTime() : Date.now(),
-        certificateId: cert.id
-      };
-      
-      const docType = getDocumentTypeFromStorage(cert.id, cert.student);
-      
-      let pdfBlob;
-      let fileType;
+    const pdfData = {
+      studentName: cert.studentName,
+      courseName: cert.courseName,
+      workloadHours: parseInt(cert.workloadHours) || 0,
+      issueDate: cert.issuedAt ? new Date(cert.issuedAt * 1000).getTime() : Date.now(),
+      certificateId: cert.id
+    };
 
-      if (isBadge) {
-        pdfBlob = generateBadgePDF(pdfData, 'medium');
-        fileType = 'badge';
-      } else {
-        pdfBlob = generateCertificatePDF(pdfData);
-        fileType = 'certificate';
-      }
+    const isBadge = cert.documentType === 1;
+    const pdfBlob = isBadge ? generateBadgePDF(pdfData, 'medium') : generateCertificatePDF(pdfData);
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const fileType = isBadge ? 'badge' : 'certificate';
 
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-
-      setPdfUrls(prev => ({
-        ...prev,
-        [cert.id]: { url: pdfUrl, type: fileType }
-      }));
-
-      return { pdfUrl, type: fileType };
-    } catch (err) {
-      console.error('Erro ao gerar documento:', err);
-      return null;
-    }
+    setPdfUrls(prev => ({ ...prev, [cert.id]: { url: pdfUrl, type: fileType } }));
+    return { pdfUrl, type: fileType };
   };
 
   const loadCertificates = async () => {
@@ -111,8 +73,12 @@ const MyCertificatesPage = () => {
             documentType: Number(cert.documentType)
           };
           
-          await generatePDFForCertificate(certData);
-          
+          try {
+            await generatePDFForCertificate(certData);
+          } catch (pdfErr) {
+            console.error(`Erro ao gerar PDF do certificado ${id}:`, pdfErr);
+          }
+
           return certData;
         } catch (err) {
           console.error(`Erro ao buscar certificado ${id}:`, err);
@@ -206,7 +172,7 @@ const MyCertificatesPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {certificates.map((cert, index) => {
             const docInfo = pdfUrls[cert.id];
-            const isBadge = docInfo && docInfo.type === 'badge';
+            const isBadge = cert.documentType === 1;
             
             return (
               <div key={index} className="card hover:shadow-2xl transition-shadow">
