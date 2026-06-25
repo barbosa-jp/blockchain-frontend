@@ -118,7 +118,8 @@ const IssuePage = () => {
         studentName,
         courseName,
         BigInt(parseInt(workloadHours)),
-        fileHash
+        fileHash,
+        documentType === 'badge' ? 1 : 0
       );
 
       toast.loading('Aguardando confirmação da transação...', { id: 'tx' });
