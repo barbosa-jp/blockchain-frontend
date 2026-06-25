@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useMetaMask } from '../hooks/useMetaMask';
 import { getContract } from '../utils/contract';
-import { generateCertificatePDF } from '../utils/pdfGenerator';
+import { generateCertificatePDF, generateBadgePDF } from '../utils/pdfGenerator';
 import toast from 'react-hot-toast';
-import { FileUp, Loader2, CheckCircle, XCircle, Download, User, BookOpen, Clock, Wallet, Sparkles } from 'lucide-react';
+import { FileUp, Loader2, CheckCircle, XCircle, Download, User, BookOpen, Clock, Wallet, Sparkles, Award, Shield } from 'lucide-react';
 
 const IssuePage = () => {
   const { signer, isConnected, account } = useMetaMask();
@@ -14,6 +14,7 @@ const IssuePage = () => {
     courseName: '',
     workloadHours: '',
   });
+  const [documentType, setDocumentType] = useState('certificate');
   const [isLoading, setIsLoading] = useState(false);
   const [txHash, setTxHash] = useState(null);
   const [error, setError] = useState(null);
@@ -50,7 +51,7 @@ const IssuePage = () => {
     }
 
     if (!studentAddress.startsWith('0x') || studentAddress.length !== 42) {
-      toast.error('Endereço Ethereum inválido. Deve começar com 0x e ter 42 caracteres');
+      toast.error('Endereço Ethereum inválido');
       return;
     }
 
@@ -60,7 +61,6 @@ const IssuePage = () => {
     setGeneratedPDF(null);
 
     try {
-      // 1. Gerar Certificado em PDF
       const pdfData = {
         studentName,
         courseName,
@@ -69,11 +69,21 @@ const IssuePage = () => {
         certificateId: `temp-${Date.now()}`
       };
       
-      const pdfBlob = generateCertificatePDF(pdfData);
+      let pdfBlob;
+      let fileName;
+      
+      if (documentType === 'certificate') {
+        pdfBlob = generateCertificatePDF(pdfData);
+        fileName = `certificado-${studentName}.pdf`;
+      } else {
+        pdfBlob = generateBadgePDF(pdfData, 'medium');
+        fileName = `badge-${studentName}.pdf`;
+      }
+      
       setGeneratedPDF(pdfBlob);
       
       // 2. Calcular hash do PDF
-      const file = new File([pdfBlob], `certificado-${studentName}.pdf`, { type: 'application/pdf' });
+      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       const buffer = await file.arrayBuffer();
       const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -114,7 +124,21 @@ const IssuePage = () => {
         setCertificateId(Math.floor(Math.random() * 10000).toString());
       }
 
-      toast.success('Certificado emitido com sucesso!', { id: 'tx' });
+      // SALVAR O TIPO DE DOCUMENTO NO LOCALSTORAGE
+      const docKey = `doc_${studentAddress}_${Date.now()}`;
+      const docInfo = {
+        id: certificateId || 'N/A',
+        studentAddress,
+        documentType,
+        issuedAt: Date.now()
+      };
+      
+      // Salvar no localStorage
+      const savedDocs = JSON.parse(localStorage.getItem('academicchain_docs') || '[]');
+      savedDocs.push(docInfo);
+      localStorage.setItem('academicchain_docs', JSON.stringify(savedDocs));
+
+      toast.success(`${documentType === 'certificate' ? 'Certificado' : 'Badge'} emitido com sucesso!`, { id: 'tx' });
 
       setFormData({ 
         studentName: '', 
@@ -124,7 +148,7 @@ const IssuePage = () => {
       });
 
     } catch (err) {
-      console.error('Erro ao emitir certificado:', err);
+      console.error('Erro ao emitir:', err);
       setError(err.message || 'Erro desconhecido');
       toast.error(`Erro: ${err.message || 'Erro desconhecido'}`, { id: 'tx' });
     } finally {
@@ -137,7 +161,10 @@ const IssuePage = () => {
       const url = URL.createObjectURL(generatedPDF);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `certificado-${formData.studentName || 'aluno'}.pdf`;
+      const fileName = documentType === 'certificate' 
+        ? `certificado-${formData.studentName || 'aluno'}.pdf`
+        : `badge-${formData.studentName || 'aluno'}.pdf`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -152,7 +179,7 @@ const IssuePage = () => {
         <h2 className="text-2xl font-semibold text-gray-700 mb-4">
           Conecte sua MetaMask
         </h2>
-        <p className="text-gray-500">Para emitir certificados, você precisa estar conectado</p>
+        <p className="text-gray-500">Para emitir documentos, você precisa estar conectado</p>
       </div>
     );
   }
@@ -161,10 +188,51 @@ const IssuePage = () => {
     <div className="max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold text-gray-800 mb-6 flex items-center">
         <FileUp className="mr-3 text-primary-600" size={28} />
-        Emitir Certificado
+        Emitir Documento
       </h1>
 
       <form onSubmit={handleSubmit} className="card space-y-6">
+        <div>
+          <label className="label-field">Tipo de Documento</label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setDocumentType('certificate')}
+              className={`p-4 rounded-lg border-2 transition-all ${
+                documentType === 'certificate'
+                  ? 'border-primary-600 bg-primary-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex flex-col items-center">
+                <Award size={28} className={documentType === 'certificate' ? 'text-primary-600' : 'text-gray-400'} />
+                <span className={`text-sm font-medium mt-1 ${documentType === 'certificate' ? 'text-primary-600' : 'text-gray-600'}`}>
+                  Certificado
+                </span>
+                <span className="text-xs text-gray-400">Formato tradicional</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDocumentType('badge')}
+              className={`p-4 rounded-lg border-2 transition-all ${
+                documentType === 'badge'
+                  ? 'border-primary-600 bg-primary-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex flex-col items-center">
+                <Shield size={28} className={documentType === 'badge' ? 'text-primary-600' : 'text-gray-400'} />
+                <span className={`text-sm font-medium mt-1 ${documentType === 'badge' ? 'text-primary-600' : 'text-gray-600'}`}>
+                  Badge
+                </span>
+                <span className="text-xs text-gray-400">Distintivo digital</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Campos do Formulário */}
         <div>
           <label className="label-field flex items-center">
             <User size={18} className="mr-2 text-primary-600" />
@@ -208,7 +276,7 @@ const IssuePage = () => {
             </button>
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            Endereço Ethereum do estudante que receberá o certificado
+            Endereço Ethereum do estudante que receberá o documento
           </p>
         </div>
 
@@ -250,7 +318,9 @@ const IssuePage = () => {
         <div className="p-4 bg-gradient-to-r from-primary-50 to-purple-50 border border-primary-200 rounded-lg">
           <p className="text-sm text-primary-700 flex items-center">
             <Sparkles className="mr-2" size={18} />
-            O certificado será gerado em PDF com design profissional
+            {documentType === 'certificate' 
+              ? 'O certificado será gerado em PDF com design profissional tradicional'
+              : 'O badge será gerado em PDF com design de distintivo circular'}
           </p>
         </div>
 
@@ -267,7 +337,7 @@ const IssuePage = () => {
           ) : (
             <>
               <FileUp size={20} />
-              <span>Emitir Certificado</span>
+              <span>Emitir {documentType === 'certificate' ? 'Certificado' : 'Badge'}</span>
             </>
           )}
         </button>
@@ -287,9 +357,11 @@ const IssuePage = () => {
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start space-x-2">
               <CheckCircle className="text-green-500 flex-shrink-0 mt-0.5" size={20} />
               <div>
-                <p className="text-green-700 font-semibold">Certificado emitido com sucesso!</p>
+                <p className="text-green-700 font-semibold">
+                  {documentType === 'certificate' ? 'Certificado' : 'Badge'} emitido com sucesso!
+                </p>
                 <p className="text-sm text-gray-600">
-                  ID do Certificado: #{certificateId || 'N/A'}
+                  ID: #{certificateId || 'N/A'}
                 </p>
                 <a
                   href={`https://sepolia.etherscan.io/tx/${txHash}`}
@@ -307,7 +379,7 @@ const IssuePage = () => {
               className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center space-x-2 transition-colors"
             >
               <Download size={20} />
-              <span>Baixar Certificado PDF</span>
+              <span>Baixar {documentType === 'certificate' ? 'Certificado' : 'Badge'} PDF</span>
             </button>
           </div>
         )}

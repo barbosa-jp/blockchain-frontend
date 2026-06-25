@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useMetaMask } from '../hooks/useMetaMask';
 import { getContract } from '../utils/contract';
 import { formatDate, formatAddress } from '../utils/helpers';
-import { generateCertificatePDF } from '../utils/pdfGenerator';
+import { generateCertificatePDF, generateBadgePDF } from '../utils/pdfGenerator';
 import toast from 'react-hot-toast';
-import { Award, Loader2, CheckCircle, XCircle, ExternalLink, Download, FileText, Eye } from 'lucide-react';
+import { Award, Loader2, CheckCircle, XCircle, ExternalLink, Download, FileText, Eye, Shield } from 'lucide-react';
 
 const MyCertificatesPage = () => {
   const { signer, account, isConnected } = useMetaMask();
@@ -12,6 +12,36 @@ const MyCertificatesPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pdfUrls, setPdfUrls] = useState({});
+
+  // Função para buscar o tipo de documento no localStorage
+  const getDocumentTypeFromStorage = (certId, studentAddress) => {
+    try {
+      const savedData = localStorage.getItem('academicchain_docs');
+      if (!savedData) {
+        console.log('Nenhum dado salvo no localStorage');
+        return 'certificate';
+      }
+      
+      const savedDocs = JSON.parse(savedData);
+      console.log('Documentos salvos:', savedDocs);
+      
+      // Procurar o documento pelo ID e endereço do estudante
+      const doc = savedDocs.find(d => 
+        d.id === certId && d.studentAddress.toLowerCase() === studentAddress.toLowerCase()
+      );
+      
+      if (doc) {
+        console.log(`Documento ${certId} encontrado:`, doc);
+        return doc.type || 'certificate';
+      }
+      
+      console.log(`Documento ${certId} não encontrado, usando padrão 'certificate'`);
+      return 'certificate';
+    } catch (err) {
+      console.error('Erro ao ler localStorage:', err);
+      return 'certificate';
+    }
+  };
 
   useEffect(() => {
     if (isConnected && account) {
@@ -32,17 +62,31 @@ const MyCertificatesPage = () => {
         certificateId: cert.id
       };
       
-      const pdfBlob = generateCertificatePDF(pdfData);
-      const url = URL.createObjectURL(pdfBlob);
+      // Buscar o tipo de documento do localStorage
+      const docType = getDocumentTypeFromStorage(cert.id, cert.student);
+      console.log(`Gerando documento ${cert.id} como:`, docType);
+      
+      let pdfBlob;
+      let fileType;
+      
+      if (docType === 'badge') {
+        pdfBlob = generateBadgePDF(pdfData, 'medium');
+        fileType = 'badge';
+      } else {
+        pdfBlob = generateCertificatePDF(pdfData);
+        fileType = 'certificate';
+      }
+      
+      const pdfUrl = URL.createObjectURL(pdfBlob);
       
       setPdfUrls(prev => ({
         ...prev,
-        [cert.id]: url
+        [cert.id]: { url: pdfUrl, type: fileType }
       }));
       
-      return url;
+      return { pdfUrl, type: fileType };
     } catch (err) {
-      console.error('Erro ao gerar PDF:', err);
+      console.error('Erro ao gerar documento:', err);
       return null;
     }
   };
@@ -55,6 +99,7 @@ const MyCertificatesPage = () => {
       const contract = getContract(signer);
       
       const ids = await contract.getMyCertificates();
+      console.log('IDs dos certificados:', ids);
 
       if (ids.length === 0) {
         setCertificates([]);
@@ -102,25 +147,28 @@ const MyCertificatesPage = () => {
   };
 
   const handleDownloadPDF = (cert) => {
-    const url = pdfUrls[cert.id];
-    if (url) {
+    const docInfo = pdfUrls[cert.id];
+    if (docInfo && docInfo.url) {
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `certificado-${cert.studentName}-${cert.id}.pdf`;
+      a.href = docInfo.url;
+      const fileName = docInfo.type === 'badge' 
+        ? `badge-${cert.studentName}-${cert.id}.pdf`
+        : `certificado-${cert.studentName}-${cert.id}.pdf`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      toast.success('PDF baixado com sucesso!');
+      toast.success(`${docInfo.type === 'badge' ? 'Badge' : 'Certificado'} baixado com sucesso!`);
     } else {
-      toast.error('Erro ao baixar PDF');
+      toast.error('Erro ao baixar documento');
     }
   };
 
   // Cleanup URLs ao desmontar
   useEffect(() => {
     return () => {
-      Object.values(pdfUrls).forEach(url => {
-        if (url) URL.revokeObjectURL(url);
+      Object.values(pdfUrls).forEach(docInfo => {
+        if (docInfo && docInfo.url) URL.revokeObjectURL(docInfo.url);
       });
     };
   }, [pdfUrls]);
@@ -149,7 +197,7 @@ const MyCertificatesPage = () => {
     <div>
       <h1 className="text-3xl font-bold text-gray-800 mb-6 flex items-center">
         <Award className="mr-3 text-primary-600" size={28} />
-        Meus Certificados
+        Meus Documentos
       </h1>
 
       {error && (
@@ -162,105 +210,127 @@ const MyCertificatesPage = () => {
         <div className="card text-center py-12">
           <Award className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-600 mb-2">
-            Nenhum certificado encontrado
+            Nenhum documento encontrado
           </h3>
           <p className="text-gray-500">
-            Você ainda não possui certificados emitidos nesta carteira
+            Você ainda não possui documentos emitidos nesta carteira
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {certificates.map((cert, index) => (
-            <div key={index} className="card hover:shadow-2xl transition-shadow">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center space-x-2">
-                  {cert.revoked ? (
-                    <XCircle className="text-red-500" size={20} />
-                  ) : (
-                    <CheckCircle className="text-green-500" size={20} />
-                  )}
-                  <span className={`text-sm font-semibold ${
-                    cert.revoked ? 'text-red-600' : 'text-green-600'
-                  }`}>
-                    {cert.revoked ? 'Revogado' : 'Válido'}
-                  </span>
-                </div>
-                <span className="text-sm text-gray-400">ID: #{cert.id}</span>
-              </div>
-
-              <h3 className="text-lg font-semibold text-gray-800 mb-1">
-                {cert.studentName}
-              </h3>
-              <p className="text-gray-600 mb-2">{cert.courseName}</p>
-
-              <div className="space-y-1 text-sm text-gray-500">
-                <p><strong>Carga Horária:</strong> {cert.workloadHours}h</p>
-                <p><strong>Emissor:</strong> {formatAddress(cert.issuedBy)}</p>
-                <p><strong>Data:</strong> {formatDate(cert.issuedAt)}</p>
-              </div>
-
-              {cert.revoked && cert.revokeReason !== 'N/A' && (
-                <div className="mt-3 p-2 bg-red-50 border border-red-100 rounded text-sm text-red-600">
-                  <strong>Motivo da revogação:</strong> {cert.revokeReason}
-                </div>
-              )}
-
-              {/* Prévia do PDF */}
-              {pdfUrls[cert.id] && (
-                <div className="mt-4">
-                  <div className="relative border border-gray-200 rounded-lg overflow-hidden bg-gray-50" style={{ height: '200px' }}>
-                    <object
-                      data={pdfUrls[cert.id]}
-                      type="application/pdf"
-                      className="w-full h-full"
-                    >
-                      <div className="flex items-center justify-center h-full text-gray-400">
-                        <div className="text-center">
-                          <FileText size={32} className="mx-auto mb-2" />
-                          <p className="text-xs">Prévia do certificado</p>
-                          <p className="text-xs text-gray-300">Clique em "Visualizar" para abrir</p>
-                        </div>
-                      </div>
-                    </object>
+          {certificates.map((cert, index) => {
+            const docInfo = pdfUrls[cert.id];
+            const isBadge = docInfo && docInfo.type === 'badge';
+            
+            return (
+              <div key={index} className="card hover:shadow-2xl transition-shadow">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center space-x-2">
+                    {cert.revoked ? (
+                      <XCircle className="text-red-500" size={20} />
+                    ) : (
+                      <CheckCircle className="text-green-500" size={20} />
+                    )}
+                    <span className={`text-sm font-semibold ${
+                      cert.revoked ? 'text-red-600' : 'text-green-600'
+                    }`}>
+                      {cert.revoked ? 'Revogado' : 'Válido'}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      isBadge 
+                        ? 'bg-purple-100 text-purple-700' 
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {isBadge ? (
+                        <span className="flex items-center">
+                          <Shield size={12} className="mr-1" />
+                          Badge
+                        </span>
+                      ) : (
+                        <span className="flex items-center">
+                          <FileText size={12} className="mr-1" />
+                          Certificado
+                        </span>
+                      )}
+                    </span>
                   </div>
+                  <span className="text-sm text-gray-400">ID: #{cert.id}</span>
                 </div>
-              )}
 
-              <div className="mt-4 flex justify-end space-x-3">
-                {pdfUrls[cert.id] && (
+                <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                  {cert.studentName}
+                </h3>
+                <p className="text-gray-600 mb-2">{cert.courseName}</p>
+
+                <div className="space-y-1 text-sm text-gray-500">
+                  <p><strong>Carga Horária:</strong> {cert.workloadHours}h</p>
+                  <p><strong>Emissor:</strong> {formatAddress(cert.issuedBy)}</p>
+                  <p><strong>Data:</strong> {formatDate(cert.issuedAt)}</p>
+                </div>
+
+                {cert.revoked && cert.revokeReason !== 'N/A' && (
+                  <div className="mt-3 p-2 bg-red-50 border border-red-100 rounded text-sm text-red-600">
+                    <strong>Motivo da revogação:</strong> {cert.revokeReason}
+                  </div>
+                )}
+
+                {docInfo && docInfo.url && (
+                  <div className="mt-4 border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        {isBadge ? (
+                          <Shield size={18} className="text-purple-600" />
+                        ) : (
+                          <FileText size={18} className="text-primary-600" />
+                        )}
+                        <span className="text-sm font-medium text-gray-700">
+                          {isBadge ? 'Badge' : 'Certificado'}
+                        </span>
+                      </div>
+                      <div className="flex space-x-2">
+                        <a
+                          href={docInfo.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`p-2 rounded-lg transition-colors ${
+                            isBadge 
+                              ? 'text-purple-600 hover:bg-purple-50' 
+                              : 'text-primary-600 hover:bg-primary-50'
+                          }`}
+                          title={`Visualizar ${isBadge ? 'Badge' : 'Certificado'}`}
+                        >
+                          <Eye size={18} />
+                        </a>
+                        <button
+                          onClick={() => handleDownloadPDF(cert)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            isBadge 
+                              ? 'text-purple-600 hover:bg-purple-50' 
+                              : 'text-green-600 hover:bg-green-50'
+                          }`}
+                          title={`Baixar ${isBadge ? 'Badge' : 'Certificado'}`}
+                        >
+                          <Download size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-4 flex justify-end">
                   <a
-                    href={pdfUrls[cert.id]}
+                    href={`https://sepolia.etherscan.io/address/${account}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary-600 hover:text-primary-800 text-sm flex items-center space-x-1 px-3 py-1 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
+                    className="text-gray-500 hover:text-gray-700 text-sm flex items-center space-x-1"
                   >
-                    <Eye size={16} />
-                    <span>Visualizar</span>
+                    <ExternalLink size={16} />
+                    <span>Ver na Blockchain</span>
                   </a>
-                )}
-                
-                {pdfUrls[cert.id] && (
-                  <button
-                    onClick={() => handleDownloadPDF(cert)}
-                    className="text-green-600 hover:text-green-800 text-sm flex items-center space-x-1 px-3 py-1 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-                  >
-                    <Download size={16} />
-                    <span>Baixar</span>
-                  </button>
-                )}
-
-                <a
-                  href={`https://sepolia.etherscan.io/address/${account}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-500 hover:text-gray-700 text-sm flex items-center space-x-1"
-                >
-                  <ExternalLink size={16} />
-                  <span>Blockchain</span>
-                </a>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
