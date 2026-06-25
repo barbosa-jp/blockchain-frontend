@@ -24,40 +24,21 @@ const MyCertificatesPage = () => {
   }, [isConnected, account]);
 
   const generatePDFForCertificate = async (cert) => {
-    try {
-      const pdfData = {
-        studentName: cert.studentName,
-        courseName: cert.courseName,
-        workloadHours: parseInt(cert.workloadHours) || 0,
-        issueDate: cert.issuedAt ? new Date(cert.issuedAt * 1000).getTime() : Date.now(),
-        certificateId: cert.id
-      };
+    const pdfData = {
+      studentName: cert.studentName,
+      courseName: cert.courseName,
+      workloadHours: parseInt(cert.workloadHours) || 0,
+      issueDate: cert.issuedAt ? new Date(cert.issuedAt * 1000).getTime() : Date.now(),
+      certificateId: cert.id
+    };
 
-      const isBadge = cert.documentType === 1;
+    const isBadge = cert.documentType === 1;
+    const pdfBlob = isBadge ? generateBadgePDF(pdfData, 'medium') : generateCertificatePDF(pdfData);
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const fileType = isBadge ? 'badge' : 'certificate';
 
-      let pdfBlob;
-      let fileType;
-
-      if (isBadge) {
-        pdfBlob = generateBadgePDF(pdfData, 'medium');
-        fileType = 'badge';
-      } else {
-        pdfBlob = generateCertificatePDF(pdfData);
-        fileType = 'certificate';
-      }
-
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-
-      setPdfUrls(prev => ({
-        ...prev,
-        [cert.id]: { url: pdfUrl, type: fileType }
-      }));
-
-      return { pdfUrl, type: fileType };
-    } catch (err) {
-      console.error('Erro ao gerar documento:', err);
-      return null;
-    }
+    setPdfUrls(prev => ({ ...prev, [cert.id]: { url: pdfUrl, type: fileType } }));
+    return { pdfUrl, type: fileType };
   };
 
   const loadCertificates = async () => {
@@ -94,8 +75,12 @@ const MyCertificatesPage = () => {
             documentType: Number(cert.documentType)
           };
           
-          await generatePDFForCertificate(certData);
-          
+          try {
+            await generatePDFForCertificate(certData);
+          } catch (pdfErr) {
+            console.error(`Erro ao gerar PDF do certificado ${id}:`, pdfErr);
+          }
+
           return certData;
         } catch (err) {
           console.error(`Erro ao buscar certificado ${id}:`, err);
@@ -190,7 +175,7 @@ const MyCertificatesPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {certificates.map((cert, index) => {
             const docInfo = pdfUrls[cert.id];
-            const isBadge = docInfo && docInfo.type === 'badge';
+            const isBadge = cert.documentType === 1;
             
             return (
               <div key={index} className="card hover:shadow-2xl transition-shadow">
