@@ -35,7 +35,7 @@ export const generateCertificatePDF = (data) => {
     doc.setFont('helvetica', 'normal');
     doc.text('Certificamos que', pageWidth / 2, 95, { align: 'center' });
     
-    doc.setFontSize(28);
+    doc.setFontSize(48);
     doc.setTextColor(124, 58, 237);
     doc.setFont('helvetica', 'bold');
     doc.text(studentName || 'Nome do Aluno', pageWidth / 2, 125, { align: 'center' });
@@ -48,12 +48,12 @@ export const generateCertificatePDF = (data) => {
     doc.setFontSize(22);
     doc.setTextColor(124, 58, 237);
     doc.setFont('helvetica', 'bold');
-    doc.text(courseName || 'Nome do Curso', pageWidth / 2, 175, { align: 'center' });
+    doc.text(courseName || 'Nome do Curso', pageWidth / 2, 160, { align: 'center' });
     
     doc.setFontSize(14);
     doc.setTextColor(50, 50, 50);
     doc.setFont('helvetica', 'normal');
-    doc.text(`com carga horária de ${workloadHours || 0} horas`, pageWidth / 2, 195, { align: 'center' });
+    doc.text(`com carga horária de ${workloadHours || 0} horas`, pageWidth / 2, 180, { align: 'center' });
     
     let formattedDate = 'Data não disponível';
     if (issueDate) {
@@ -68,7 +68,7 @@ export const generateCertificatePDF = (data) => {
     }
     doc.setFontSize(12);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Emitido em ${formattedDate}`, pageWidth / 2, 220, { align: 'center' });
+    doc.text(`Emitido em ${formattedDate}`, pageWidth / 2, 200, { align: 'center' });
     
     doc.setFontSize(12);
     doc.setTextColor(50, 50, 50);
@@ -140,17 +140,17 @@ export const generateBadgePDF = (data, size = 'medium') => {
     doc.setFillColor(color.text);
     doc.circle(centerX, centerY, radius * 0.85, 'F');
     
-    doc.setDrawColor(0, 215, 255);
+    doc.setDrawColor(215, 200, 0);
     doc.setLineWidth(3);
     doc.circle(centerX, centerY, radius - 1, 'D');
     
     doc.setFontSize(radius * 0.22);
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'bold');
     doc.text('CERTIFICADO', centerX, centerY - radius * 0.40, { align: 'center' });
     
-    doc.setFontSize(radius * 0.32);
-    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(radius * 0.48);
+    doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'bold');
     const maxNameLength = Math.floor(radius * 0.5);
     let name = studentName || 'Nome do Aluno';
@@ -159,8 +159,8 @@ export const generateBadgePDF = (data, size = 'medium') => {
     }
     doc.text(name, centerX, centerY - radius * 0.10, { align: 'center' });
     
-    doc.setFontSize(radius * 0.14);
-    doc.setTextColor(255, 255, 255, 0.85);
+    doc.setFontSize(radius * 0.16);
+    doc.setTextColor(0, 0, 0, 0.85);
     doc.setFont('helvetica', 'normal');
     const maxCourseLength = Math.floor(radius * 0.5);
     let course = courseName || 'Nome do Curso';
@@ -170,7 +170,7 @@ export const generateBadgePDF = (data, size = 'medium') => {
     doc.text(course, centerX, centerY + radius * 0.20, { align: 'center' });
     
 
-    doc.setDrawColor(0, 215, 255);
+    doc.setDrawColor(color.bg);
     doc.setLineWidth(1.5);
     const lineY = centerY + radius * 0.32;
     doc.line(centerX - radius * 0.35, lineY, centerX + radius * 0.35, lineY);
@@ -181,7 +181,7 @@ export const generateBadgePDF = (data, size = 'medium') => {
     doc.text(`#${certificateId || 'N/A'}`, centerX, centerY + radius * 0.48, { align: 'center' });
   
     if (workloadHours) {
-      doc.setFontSize(radius * 0.10);
+      doc.setFontSize(radius * 0.16);
       doc.setTextColor(255, 255, 255, 0.5);
       doc.setFont('helvetica', 'normal');
       doc.text(`${workloadHours} horas`, centerX, centerY + radius * 0.62, { align: 'center' });
