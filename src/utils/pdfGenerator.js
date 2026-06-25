@@ -1,6 +1,5 @@
 import jsPDF from 'jspdf';
 
-// Função para gerar Certificado tradicional
 export const generateCertificatePDF = (data) => {
   const { studentName, courseName, workloadHours, issueDate, certificateId } = data;
   
@@ -9,7 +8,6 @@ export const generateCertificatePDF = (data) => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     
-    // Borda externa
     doc.setDrawColor(124, 58, 237);
     doc.setLineWidth(2);
     doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
@@ -18,7 +16,6 @@ export const generateCertificatePDF = (data) => {
     doc.setLineWidth(0.5);
     doc.rect(14, 14, pageWidth - 28, pageHeight - 28);
     
-    // Título
     doc.setFontSize(32);
     doc.setTextColor(124, 58, 237);
     doc.setFont('helvetica', 'bold');
@@ -99,7 +96,6 @@ export const generateCertificatePDF = (data) => {
   }
 };
 
-// Função para gerar Badge - ESTILO MODERNO COM FONTES MUITO MAIORES
 export const generateBadgePDF = (data, size = 'medium') => {
   const sizes = {
     small: [160, 160],
@@ -118,16 +114,15 @@ export const generateBadgePDF = (data, size = 'medium') => {
     const centerY = pageHeight / 2;
     const radius = Math.min(pageWidth, pageHeight) / 2 - 8;
     
-    // CORES - Paleta moderna
     const colors = [
-      { bg: '#4F46E5', text: '#C7D2FE' }, // Índigo
-      { bg: '#7C3AED', text: '#DDD6FE' }, // Roxo
-      { bg: '#2563EB', text: '#BFDBFE' }, // Azul
-      { bg: '#059669', text: '#A7F3D0' }, // Verde
-      { bg: '#DC2626', text: '#FECACA' }, // Vermelho
-      { bg: '#D97706', text: '#FDE68A' }, // Laranja
-      { bg: '#0891B2', text: '#CFFAFE' }, // Ciano
-      { bg: '#7C3AED', text: '#C4B5FD' }, // Roxo escuro
+      { bg: '#4F46E5', text: '#C7D2FE' }, 
+      { bg: '#7C3AED', text: '#DDD6FE' }, 
+      { bg: '#2563EB', text: '#BFDBFE' }, 
+      { bg: '#059669', text: '#A7F3D0' }, 
+      { bg: '#DC2626', text: '#FECACA' }, 
+      { bg: '#D97706', text: '#FDE68A' }, 
+      { bg: '#0891B2', text: '#CFFAFE' }, 
+      { bg: '#7C3AED', text: '#C4B5FD' }, 
     ];
     
     let colorIndex = 0;
@@ -139,33 +134,21 @@ export const generateBadgePDF = (data, size = 'medium') => {
     }
     const color = colors[colorIndex];
     
-    // ==========================================
-    // FUNDO SIMPLES
-    // ==========================================
     doc.setFillColor(color.bg);
     doc.circle(centerX, centerY, radius, 'F');
     
     doc.setFillColor(color.text);
     doc.circle(centerX, centerY, radius * 0.85, 'F');
     
-    // ==========================================
-    // BORDA DOURADA MAIS GROSSA
-    // ==========================================
-    doc.setDrawColor(255, 215, 0);
+    doc.setDrawColor(0, 215, 255);
     doc.setLineWidth(3);
     doc.circle(centerX, centerY, radius - 1, 'D');
     
-    // ==========================================
-    // TÍTULO "CERTIFICADO" - MUITO MAIOR
-    // ==========================================
     doc.setFontSize(radius * 0.22);
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.text('CERTIFICADO', centerX, centerY - radius * 0.40, { align: 'center' });
     
-    // ==========================================
-    // NOME DO ALUNO - MUITO MAIOR (DESTAQUE)
-    // ==========================================
     doc.setFontSize(radius * 0.32);
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
@@ -176,9 +159,6 @@ export const generateBadgePDF = (data, size = 'medium') => {
     }
     doc.text(name, centerX, centerY - radius * 0.10, { align: 'center' });
     
-    // ==========================================
-    // CURSO - MUITO MAIOR
-    // ==========================================
     doc.setFontSize(radius * 0.14);
     doc.setTextColor(255, 255, 255, 0.85);
     doc.setFont('helvetica', 'normal');
@@ -189,25 +169,17 @@ export const generateBadgePDF = (data, size = 'medium') => {
     }
     doc.text(course, centerX, centerY + radius * 0.20, { align: 'center' });
     
-    // ==========================================
-    // LINHA DECORATIVA MAIS GROSSA
-    // ==========================================
-    doc.setDrawColor(255, 215, 0);
+
+    doc.setDrawColor(0, 215, 255);
     doc.setLineWidth(1.5);
     const lineY = centerY + radius * 0.32;
     doc.line(centerX - radius * 0.35, lineY, centerX + radius * 0.35, lineY);
-    
-    // ==========================================
-    // ID DO CERTIFICADO - MUITO MAIOR (COM #)
-    // ==========================================
+     
     doc.setFontSize(radius * 0.14);
-    doc.setTextColor(255, 215, 0);
+    doc.setDrawColor(0, 215, 255);
     doc.setFont('helvetica', 'bold');
     doc.text(`#${certificateId || 'N/A'}`, centerX, centerY + radius * 0.48, { align: 'center' });
-    
-    // ==========================================
-    // CARGA HORÁRIA - MUITO MAIOR
-    // ==========================================
+  
     if (workloadHours) {
       doc.setFontSize(radius * 0.10);
       doc.setTextColor(255, 255, 255, 0.5);
@@ -215,9 +187,6 @@ export const generateBadgePDF = (data, size = 'medium') => {
       doc.text(`${workloadHours} horas`, centerX, centerY + radius * 0.62, { align: 'center' });
     }
     
-    // ==========================================
-    // DATA DE EMISSÃO - NOVO CAMPO
-    // ==========================================
     let formattedDate = '';
     if (issueDate) {
       const date = new Date(issueDate);
