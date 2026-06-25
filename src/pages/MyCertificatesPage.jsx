@@ -13,35 +13,6 @@ const MyCertificatesPage = () => {
   const [error, setError] = useState(null);
   const [pdfUrls, setPdfUrls] = useState({});
 
-  // Função para buscar o tipo de documento no localStorage
-  const getDocumentTypeFromStorage = (certId, studentAddress) => {
-    try {
-      const savedData = localStorage.getItem('academicchain_docs');
-      if (!savedData) {
-        console.log('Nenhum dado salvo no localStorage');
-        return 'certificate';
-      }
-      
-      const savedDocs = JSON.parse(savedData);
-      console.log('Documentos salvos:', savedDocs);
-      
-      // Procurar o documento pelo ID e endereço do estudante
-      const doc = savedDocs.find(d => 
-        d.id === certId && d.studentAddress.toLowerCase() === studentAddress.toLowerCase()
-      );
-      
-      if (doc) {
-        console.log(`Documento ${certId} encontrado:`, doc);
-        return doc.type || 'certificate';
-      }
-      
-      console.log(`Documento ${certId} não encontrado, usando padrão 'certificate'`);
-      return 'certificate';
-    } catch (err) {
-      console.error('Erro ao ler localStorage:', err);
-      return 'certificate';
-    }
-  };
 
   useEffect(() => {
     if (isConnected && account) {
@@ -61,29 +32,27 @@ const MyCertificatesPage = () => {
         issueDate: cert.issuedAt ? new Date(cert.issuedAt * 1000).getTime() : Date.now(),
         certificateId: cert.id
       };
-      
-      // Buscar o tipo de documento do localStorage
-      const docType = getDocumentTypeFromStorage(cert.id, cert.student);
-      console.log(`Gerando documento ${cert.id} como:`, docType);
-      
+
+      const isBadge = cert.documentType === 1;
+
       let pdfBlob;
       let fileType;
-      
-      if (docType === 'badge') {
+
+      if (isBadge) {
         pdfBlob = generateBadgePDF(pdfData, 'medium');
         fileType = 'badge';
       } else {
         pdfBlob = generateCertificatePDF(pdfData);
         fileType = 'certificate';
       }
-      
+
       const pdfUrl = URL.createObjectURL(pdfBlob);
-      
+
       setPdfUrls(prev => ({
         ...prev,
         [cert.id]: { url: pdfUrl, type: fileType }
       }));
-      
+
       return { pdfUrl, type: fileType };
     } catch (err) {
       console.error('Erro ao gerar documento:', err);
@@ -121,7 +90,8 @@ const MyCertificatesPage = () => {
             issuedBy: cert.issuedBy || 'N/A',
             documentHash: cert.documentHash || 'N/A',
             revoked: cert.revoked || false,
-            revokeReason: cert.revokeReason || 'N/A'
+            revokeReason: cert.revokeReason || 'N/A',
+            documentType: Number(cert.documentType)
           };
           
           await generatePDFForCertificate(certData);
