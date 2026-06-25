@@ -13,7 +13,6 @@ const MyCertificatesPage = () => {
   const [error, setError] = useState(null);
   const [pdfUrls, setPdfUrls] = useState({});
 
-
   useEffect(() => {
     if (isConnected && account) {
       loadCertificates();
@@ -49,7 +48,6 @@ const MyCertificatesPage = () => {
       const contract = getContract(signer);
       
       const ids = await contract.getMyCertificates();
-      console.log('IDs dos certificados:', ids);
 
       if (ids.length === 0) {
         setCertificates([]);
@@ -119,7 +117,6 @@ const MyCertificatesPage = () => {
     }
   };
 
-  // Cleanup URLs ao desmontar
   useEffect(() => {
     return () => {
       Object.values(pdfUrls).forEach(docInfo => {
@@ -134,7 +131,7 @@ const MyCertificatesPage = () => {
         <h2 className="text-2xl font-semibold text-gray-700 mb-4">
           Conecte sua MetaMask
         </h2>
-        <p className="text-gray-500">Para visualizar seus certificados, conecte sua carteira</p>
+        <p className="text-gray-500">Para visualizar seus documentos, conecte sua carteira</p>
       </div>
     );
   }
@@ -143,7 +140,7 @@ const MyCertificatesPage = () => {
     return (
       <div className="flex justify-center items-center py-12">
         <Loader2 className="animate-spin text-primary-600" size={40} />
-        <span className="ml-3 text-gray-600">Carregando certificados...</span>
+        <span className="ml-3 text-gray-600">Carregando documentos...</span>
       </div>
     );
   }
@@ -230,15 +227,30 @@ const MyCertificatesPage = () => {
                 )}
 
                 {docInfo && docInfo.url && (
-                  <div className="mt-4 border border-gray-200 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
+                  <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                    <div className="relative" style={{ height: '250px' }}>
+                      <object
+                        data={docInfo.url}
+                        type="application/pdf"
+                        className="w-full h-full"
+                        style={{ minHeight: '250px' }}
+                      >
+                        <div className="flex flex-col items-center justify-center h-full p-4 text-gray-500">
+                          <FileText size={32} className="mb-2 text-gray-400" />
+                          <p className="text-sm text-center">Não foi possível carregar a prévia</p>
+                          <p className="text-xs text-gray-400 mt-1">Clique em "Visualizar" para abrir o PDF</p>
+                        </div>
+                      </object>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-3 bg-white border-t border-gray-200">
                       <div className="flex items-center space-x-2">
                         {isBadge ? (
-                          <Shield size={18} className="text-purple-600" />
+                          <Shield size={16} className="text-purple-600" />
                         ) : (
-                          <FileText size={18} className="text-primary-600" />
+                          <FileText size={16} className="text-primary-600" />
                         )}
-                        <span className="text-sm font-medium text-gray-700">
+                        <span className="text-xs font-medium text-gray-700">
                           {isBadge ? 'Badge' : 'Certificado'}
                         </span>
                       </div>
@@ -247,25 +259,25 @@ const MyCertificatesPage = () => {
                           href={docInfo.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`p-2 rounded-lg transition-colors ${
+                          className={`p-1.5 rounded-lg transition-colors ${
                             isBadge 
                               ? 'text-purple-600 hover:bg-purple-50' 
                               : 'text-primary-600 hover:bg-primary-50'
                           }`}
                           title={`Visualizar ${isBadge ? 'Badge' : 'Certificado'}`}
                         >
-                          <Eye size={18} />
+                          <Eye size={16} />
                         </a>
                         <button
                           onClick={() => handleDownloadPDF(cert)}
-                          className={`p-2 rounded-lg transition-colors ${
+                          className={`p-1.5 rounded-lg transition-colors ${
                             isBadge 
                               ? 'text-purple-600 hover:bg-purple-50' 
                               : 'text-green-600 hover:bg-green-50'
                           }`}
                           title={`Baixar ${isBadge ? 'Badge' : 'Certificado'}`}
                         >
-                          <Download size={18} />
+                          <Download size={16} />
                         </button>
                       </div>
                     </div>
