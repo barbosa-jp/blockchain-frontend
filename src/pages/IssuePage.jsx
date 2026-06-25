@@ -36,6 +36,29 @@ const IssuePage = () => {
     }
   };
 
+  const saveDocumentType = (id, studentAddress, type) => {
+    try {
+      let savedDocs = [];
+      const savedData = localStorage.getItem('academicchain_docs');
+      if (savedData) {
+        savedDocs = JSON.parse(savedData);
+      }
+      
+      const existingIndex = savedDocs.findIndex(d => d.id === id);
+      if (existingIndex !== -1) {
+        savedDocs[existingIndex] = { id, studentAddress, type, savedAt: Date.now() };
+      } else {
+        savedDocs.push({ id, studentAddress, type, savedAt: Date.now() });
+      }
+      
+      localStorage.setItem('academicchain_docs', JSON.stringify(savedDocs));
+      console.log('Documento salvo:', { id, studentAddress, type });
+      console.log('Todos os documentos:', savedDocs);
+    } catch (err) {
+      console.error('Erro ao salvar tipo de documento:', err);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -82,17 +105,14 @@ const IssuePage = () => {
       
       setGeneratedPDF(pdfBlob);
       
-      // 2. Calcular hash do PDF
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       const buffer = await file.arrayBuffer();
       const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
       
-      // 3. Conectar ao contrato
       const contract = getContract(signer);
       
-      // 4. Emitir certificado na blockchain
       const tx = await contract.issueCertificate(
         studentAddress,
         studentName,
@@ -107,37 +127,28 @@ const IssuePage = () => {
       const receipt = await tx.wait();
       setTxHash(receipt.hash);
       
-      // Buscar o ID do certificado do evento
+      let docId = null;
       const event = receipt.logs.find(log => {
         try {
           const parsed = contract.interface.parseLog(log);
-          return parsed && parsed.name === 'CertificateIssued';
+          if (parsed && parsed.name === 'CertificateIssued') {
+            docId = parsed.args[0].toString();
+            return true;
+          }
+          return false;
         } catch {
           return false;
         }
       });
 
-      if (event) {
-        const parsedEvent = contract.interface.parseLog(event);
-        const id = parsedEvent.args[0];
-        setCertificateId(id.toString());
+      if (docId) {
+        setCertificateId(docId);
+        saveDocumentType(docId, studentAddress, documentType);
       } else {
-        setCertificateId(Math.floor(Math.random() * 10000).toString());
+        const fallbackId = Math.floor(Math.random() * 10000).toString();
+        setCertificateId(fallbackId);
+        saveDocumentType(fallbackId, studentAddress, documentType);
       }
-
-      // SALVAR O TIPO DE DOCUMENTO NO LOCALSTORAGE
-      const docKey = `doc_${studentAddress}_${Date.now()}`;
-      const docInfo = {
-        id: certificateId || 'N/A',
-        studentAddress,
-        documentType,
-        issuedAt: Date.now()
-      };
-      
-      // Salvar no localStorage
-      const savedDocs = JSON.parse(localStorage.getItem('academicchain_docs') || '[]');
-      savedDocs.push(docInfo);
-      localStorage.setItem('academicchain_docs', JSON.stringify(savedDocs));
 
       toast.success(`${documentType === 'certificate' ? 'Certificado' : 'Badge'} emitido com sucesso!`, { id: 'tx' });
 
@@ -233,7 +244,6 @@ const IssuePage = () => {
           </div>
         </div>
 
-        {/* Campos do Formulário */}
         <div>
           <label className="label-field flex items-center">
             <User size={18} className="mr-2 text-primary-600" />

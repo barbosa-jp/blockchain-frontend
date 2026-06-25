@@ -33,15 +33,12 @@ const ManagePage = () => {
     try {
       const contract = getContract(signer);
       
-      // Verifica quem é o owner
       const owner = await contract.owner();
       setOwnerAddress(owner);
       
-      // Verifica se o usuário conectado é o owner
       const isUserOwner = owner.toLowerCase() === account.toLowerCase();
       setIsOwner(isUserOwner);
 
-      // Só carrega a lista se for owner
       if (isUserOwner) {
         await loadIssuers();
       }
@@ -58,7 +55,6 @@ const ManagePage = () => {
     try {
       const contract = getContract(signer);
       
-      // Usa a função getAuthorizedIssuers
       const issuerList = await contract.getAuthorizedIssuers();
       console.log('Lista de emissores:', issuerList);
       
@@ -75,7 +71,6 @@ const ManagePage = () => {
   const handleAddIssuer = async (e) => {
     e.preventDefault();
 
-    // Apenas owner pode autorizar
     if (!isOwner) {
       toast.error('Apenas o Owner pode autorizar emissores');
       return;
@@ -107,7 +102,6 @@ const ManagePage = () => {
     try {
       const contract = getContract(signer);
       
-      // Verifica se já é emissor
       const isAlreadyIssuer = await contract.isAuthorizedIssuer(newIssuerAddress);
       if (isAlreadyIssuer) {
         toast.error('Este endereço já é um emissor autorizado');
@@ -148,7 +142,6 @@ const ManagePage = () => {
   };
 
   const handleRemoveIssuer = async (address) => {
-    // Apenas owner pode revogar
     if (!isOwner) {
       toast.error('Apenas o Owner pode revogar emissores');
       return;
@@ -209,7 +202,6 @@ const ManagePage = () => {
     }
   };
 
-  // Carregando...
   if (isLoading || isChecking) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -219,7 +211,6 @@ const ManagePage = () => {
     );
   }
 
-  // Não conectado
   if (!isConnected) {
     return (
       <div className="text-center py-12">
@@ -232,7 +223,6 @@ const ManagePage = () => {
     );
   }
 
-  // Não é owner
   if (!isOwner) {
     return (
       <div className="max-w-2xl mx-auto">
@@ -267,7 +257,6 @@ const ManagePage = () => {
     );
   }
 
-  // É owner - mostrar o gerenciamento completo
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-6">
@@ -301,7 +290,6 @@ const ManagePage = () => {
         </div>
       )}
 
-      {/* Formulário para autorizar novo emissor */}
       <div className="card mb-8">
         <h2 className="text-xl font-semibold text-gray-700 mb-4 flex items-center">
           <UserPlus className="mr-2" size={20} />
@@ -335,7 +323,6 @@ const ManagePage = () => {
         </p>
       </div>
 
-      {/* Lista de emissores */}
       <div className="card">
         <h2 className="text-xl font-semibold text-gray-700 mb-4 flex items-center">
           <Users className="mr-2" size={20} />

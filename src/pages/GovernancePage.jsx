@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useMetaMask } from "../hooks/useMetaMask";
 import { useGovernanceToken } from "../hooks/useGovernanceToken";
 import { getContract } from "../utils/contract";
@@ -26,7 +26,9 @@ const GovernancePage = () => {
   const { signer, account, isConnected } = useMetaMask();
   const { balance, hasToken, isLoading: tokenLoading, formatBalance } = useGovernanceToken();
 
-  const [proposals, setProposals] = useState([]);
+  const [activeProposals, setActiveProposals] = useState([]);
+  const [pendingExecution, setPendingExecution] = useState([]);
+  const [allDetails, setAllDetails] = useState([]);
   const [proposalsLoading, setProposalsLoading] = useState(false);
   const [form, setForm] = useState({
     proposalType: "2",
@@ -36,25 +38,48 @@ const GovernancePage = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (isConnected && signer) {
-      loadProposals();
-    }
-  }, [isConnected, signer]);
+  const splitProposals = useCallback((details) => {
+    const agora = Math.floor(Date.now() / 1000);
+    setActiveProposals(details.filter((p) => !p.executed && Number(p.deadline) >= agora));
+    setPendingExecution(details.filter((p) => !p.executed && Number(p.deadline) < agora));
+  }, []);
 
-  const loadProposals = async () => {
+  const loadProposals = useCallback(async () => {
+    if (!signer) return;
     setProposalsLoading(true);
     try {
       const contract = getContract(signer);
-      const ids = await contract.getActiveProposals();
-      const details = await Promise.all(ids.map((id) => contract.getProposal(id)));
-      setProposals(details);
+      const activeIds = await contract.getActiveProposals();
+
+      const stored = JSON.parse(localStorage.getItem("governance_seen_ids") || "[]");
+      const allIds = [...new Set([...stored.map(String), ...activeIds.map(String)])];
+      localStorage.setItem("governance_seen_ids", JSON.stringify(allIds));
+
+      const details = await Promise.all(allIds.map((id) => contract.getProposal(id)));
+      setAllDetails(details);
+      splitProposals(details);
     } catch (err) {
       toast.error(`Erro: ${err.message}`);
     } finally {
       setProposalsLoading(false);
     }
-  };
+  }, [signer, splitProposals]);
+
+  useEffect(() => {
+    if (isConnected && signer) {
+      loadProposals();
+    }
+  }, [isConnected, signer, loadProposals]);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    const refilter = setInterval(() => splitProposals(allDetails), 5000);
+    const refetch = setInterval(() => loadProposals(), 30000);
+    return () => {
+      clearInterval(refilter);
+      clearInterval(refetch);
+    };
+  }, [isConnected, allDetails, splitProposals, loadProposals]);
 
   const handleVote = async (proposalId, support) => {
     try {
@@ -215,100 +240,117 @@ const GovernancePage = () => {
             <Loader2 className="animate-spin text-primary-600" size={32} />
             <span className="ml-3 text-gray-600">Carregando propostas...</span>
           </div>
-        ) : proposals.length === 0 ? (
+        ) : activeProposals.length === 0 ? (
           <div className="text-center py-10">
             <ShieldAlert className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">Nenhuma proposta ativa no momento.</p>
           </div>
         ) : (
           <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
-            {proposals.map((p, i) => {
-              const expired = isExpired(p.deadline);
-              const canExecute = !p.executed && expired;
-              return (
-                <div
-                  key={i}
-                  className="border border-gray-200 rounded-xl p-5 hover:border-primary-300 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-2">
-                        <span className="text-xs font-medium bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">
-                          {PROPOSAL_TYPES[Number(p.proposalType)] ?? `Tipo ${p.proposalType}`}
-                        </span>
-                        {p.executed && (
-                          <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <CheckCircle size={12} />
-                            Executada
-                          </span>
-                        )}
-                        {expired && !p.executed && (
-                          <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                            Prazo encerrado
-                          </span>
-                        )}
-                        {!expired && !p.executed && (
-                          <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                            Em votação
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-gray-800 font-medium break-words">
-                        {p.description}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Prazo: {formatDeadline(p.deadline)}
-                      </p>
+            {activeProposals.map((p, i) => (
+              <div
+                key={i}
+                className="border border-gray-200 rounded-xl p-5 hover:border-primary-300 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <span className="text-xs font-medium bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">
+                        {PROPOSAL_TYPES[Number(p.proposalType)] ?? `Tipo ${p.proposalType}`}
+                      </span>
+                      <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                        Em votação
+                      </span>
                     </div>
+                    <p className="text-gray-800 font-medium break-words">{p.description}</p>
+                    <p className="text-xs text-gray-400 mt-1">Prazo: {formatDeadline(p.deadline)}</p>
+                  </div>
 
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="flex items-center gap-1 text-green-600 font-medium">
-                          <ThumbsUp size={15} />
-                          {Number(p.votesFor)}
-                        </span>
-                        <span className="flex items-center gap-1 text-red-500 font-medium">
-                          <ThumbsDown size={15} />
-                          {Number(p.votesAgainst)}
-                        </span>
-                      </div>
-
-                      {!p.executed && !expired && hasToken && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleVote(p.id, true)}
-                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors"
-                          >
-                            <ThumbsUp size={14} />
-                            A Favor
-                          </button>
-                          <button
-                            onClick={() => handleVote(p.id, false)}
-                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors"
-                          >
-                            <ThumbsDown size={14} />
-                            Contra
-                          </button>
-                        </div>
-                      )}
-
-                      {canExecute && (
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="flex items-center gap-1 text-green-600 font-medium">
+                        <ThumbsUp size={15} />
+                        {Number(p.votesFor)}
+                      </span>
+                      <span className="flex items-center gap-1 text-red-500 font-medium">
+                        <ThumbsDown size={15} />
+                        {Number(p.votesAgainst)}
+                      </span>
+                    </div>
+                    {hasToken && (
+                      <div className="flex gap-2">
                         <button
-                          onClick={() => handleExecute(p.id)}
-                          className="bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors"
+                          onClick={() => handleVote(p.id, true)}
+                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors"
                         >
-                          <Play size={14} />
-                          Executar
+                          <ThumbsUp size={14} />
+                          A Favor
                         </button>
-                      )}
-                    </div>
+                        <button
+                          onClick={() => handleVote(p.id, false)}
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors"
+                        >
+                          <ThumbsDown size={14} />
+                          Contra
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
+
+      {pendingExecution.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <Play size={20} className="text-orange-500" />
+            Aguardando Execução
+          </h2>
+          <div className="space-y-4">
+            {pendingExecution.map((p, i) => (
+              <div
+                key={i}
+                className="border border-orange-200 bg-orange-50 rounded-xl p-5"
+              >
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <span className="text-xs font-medium bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">
+                        {PROPOSAL_TYPES[Number(p.proposalType)] ?? `Tipo ${p.proposalType}`}
+                      </span>
+                      <span className="text-xs font-medium bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                        Prazo encerrado
+                      </span>
+                    </div>
+                    <p className="text-gray-800 font-medium break-words">{p.description}</p>
+                    <div className="flex items-center gap-4 mt-1">
+                      <p className="text-xs text-gray-400">Prazo: {formatDeadline(p.deadline)}</p>
+                      <span className="flex items-center gap-1 text-green-600 text-xs font-medium">
+                        <ThumbsUp size={12} />
+                        {Number(p.votesFor)}
+                      </span>
+                      <span className="flex items-center gap-1 text-red-500 text-xs font-medium">
+                        <ThumbsDown size={12} />
+                        {Number(p.votesAgainst)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleExecute(p.id)}
+                    className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
+                  >
+                    <Play size={14} />
+                    Executar Proposta
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm p-6">
         <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
