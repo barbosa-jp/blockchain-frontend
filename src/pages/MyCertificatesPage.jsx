@@ -55,22 +55,22 @@ const MyCertificatesPage = () => {
       
       let pdfBlob;
       let fileType;
-
-      if (isBadge) {
+      
+      if (docType === 'badge') {
         pdfBlob = generateBadgePDF(pdfData, 'medium');
         fileType = 'badge';
       } else {
         pdfBlob = generateCertificatePDF(pdfData);
         fileType = 'certificate';
       }
-
+      
       const pdfUrl = URL.createObjectURL(pdfBlob);
-
+      
       setPdfUrls(prev => ({
         ...prev,
         [cert.id]: { url: pdfUrl, type: fileType }
       }));
-
+      
       return { pdfUrl, type: fileType };
     } catch (err) {
       console.error('Erro ao gerar documento:', err);
@@ -107,8 +107,7 @@ const MyCertificatesPage = () => {
             issuedBy: cert.issuedBy || 'N/A',
             documentHash: cert.documentHash || 'N/A',
             revoked: cert.revoked || false,
-            revokeReason: cert.revokeReason || 'N/A',
-            documentType: Number(cert.documentType)
+            revokeReason: cert.revokeReason || 'N/A'
           };
           
           await generatePDFForCertificate(certData);
