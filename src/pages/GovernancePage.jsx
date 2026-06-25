@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useMetaMask } from "../hooks/useMetaMask";
 import { useGovernanceToken } from "../hooks/useGovernanceToken";
 import { getContract } from "../utils/contract";
@@ -28,6 +28,7 @@ const GovernancePage = () => {
 
   const [activeProposals, setActiveProposals] = useState([]);
   const [pendingExecution, setPendingExecution] = useState([]);
+  const [allDetails, setAllDetails] = useState([]);
   const [proposalsLoading, setProposalsLoading] = useState(false);
   const [form, setForm] = useState({
     proposalType: "2",
@@ -37,13 +38,14 @@ const GovernancePage = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (isConnected && signer) {
-      loadProposals();
-    }
-  }, [isConnected, signer]);
+  const splitProposals = useCallback((details) => {
+    const agora = Math.floor(Date.now() / 1000);
+    setActiveProposals(details.filter((p) => !p.executed && Number(p.deadline) >= agora));
+    setPendingExecution(details.filter((p) => !p.executed && Number(p.deadline) < agora));
+  }, []);
 
-  const loadProposals = async () => {
+  const loadProposals = useCallback(async () => {
+    if (!signer) return;
     setProposalsLoading(true);
     try {
       const contract = getContract(signer);
@@ -54,16 +56,30 @@ const GovernancePage = () => {
       localStorage.setItem("governance_seen_ids", JSON.stringify(allIds));
 
       const details = await Promise.all(allIds.map((id) => contract.getProposal(id)));
-      const agora = Math.floor(Date.now() / 1000);
-
-      setActiveProposals(details.filter((p) => !isExpired(p.deadline) && !p.executed));
-      setPendingExecution(details.filter((p) => !p.executed && Number(p.deadline) < agora));
+      setAllDetails(details);
+      splitProposals(details);
     } catch (err) {
       toast.error(`Erro: ${err.message}`);
     } finally {
       setProposalsLoading(false);
     }
-  };
+  }, [signer, splitProposals]);
+
+  useEffect(() => {
+    if (isConnected && signer) {
+      loadProposals();
+    }
+  }, [isConnected, signer, loadProposals]);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    const refilter = setInterval(() => splitProposals(allDetails), 5000);
+    const refetch = setInterval(() => loadProposals(), 30000);
+    return () => {
+      clearInterval(refilter);
+      clearInterval(refetch);
+    };
+  }, [isConnected, allDetails, splitProposals, loadProposals]);
 
   const handleVote = async (proposalId, support) => {
     try {
